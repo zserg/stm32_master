@@ -1,7 +1,7 @@
 /**
   ******************************************************************************
   * @file    stm32f1xx_it.c
-  * @date    20/03/2015 13:00:29
+  * @date    26/03/2015 16:58:44
   * @brief   Interrupt Service Routines.
   ******************************************************************************
   *
@@ -43,8 +43,6 @@
  
 extern void xPortSysTickHandler(void);
 
-extern PCD_HandleTypeDef hpcd_USB_FS;
-
 /******************************************************************************/
 /*            Cortex-M3 Processor Interruption and Exception Handlers         */ 
 /******************************************************************************/
@@ -64,20 +62,6 @@ void SysTick_Handler(void)
   /* USER CODE BEGIN SysTick_IRQn 1 */
 
   /* USER CODE END SysTick_IRQn 1 */
-}
-
-/**
-* @brief This function handles USB low priority or CAN RX0 interrupts.
-*/
-void USB_LP_CAN1_RX0_IRQHandler(void)
-{
-  /* USER CODE BEGIN USB_LP_CAN1_RX0_IRQn 0 */
-
-  /* USER CODE END USB_LP_CAN1_RX0_IRQn 0 */
-  HAL_PCD_IRQHandler(&hpcd_USB_FS);
-  /* USER CODE BEGIN USB_LP_CAN1_RX0_IRQn 1 */
-
-  /* USER CODE END USB_LP_CAN1_RX0_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */

@@ -1,7 +1,7 @@
 /**
   ******************************************************************************
   * File Name          : main.c
-  * Date               : 20/03/2015 13:00:30
+  * Date               : 26/03/2015 16:58:44
   * Description        : Main program body
   ******************************************************************************
   *
@@ -35,24 +35,20 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f1xx_hal.h"
 #include "cmsis_os.h"
-#include "usb_device.h"
 
 /* USER CODE BEGIN Includes */
-#include "usb_device.h"
-#include "usbd_core.h"
-#include "usbd_desc.h"
-#include "usbd_cdc.h"
-#include "usbd_cdc_if.h"
 
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
+
+UART_HandleTypeDef huart1;
 
 osThreadId defaultTaskHandle;
 
 /* USER CODE BEGIN PV */
-USBD_HandleTypeDef USBD_Device;
 xSemaphoreHandle xBinarySemaphore;
 
 /* USER CODE END PV */
@@ -60,13 +56,21 @@ xSemaphoreHandle xBinarySemaphore;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_USART1_UART_Init(void);
 void StartDefaultTask(void const * argument);
+#ifdef __GNUC__
+/* With GCC/RAISONANCE, small printf (option LD Linker->Libraries->Small printf
+    set to 'Yes') calls __io_putchar() */
+#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
+ #else
+ #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
+#endif /* __GNUC__ */
 
 /* USER CODE BEGIN PFP */
 void vGreenBlinkTask( void *pvParametrs );
 void vRedBlinkTask( void *pvParametrs );
-static uint8_t  USBD_CDC_Init (USBD_HandleTypeDef*, uint8_t cfgidx);
 static void Error_Handler(void);
 void tm_delay(uint16_t us);
 
@@ -93,20 +97,16 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_TIM1_Init();
   MX_TIM2_Init();
+  MX_USART1_UART_Init();
 
   /* USER CODE BEGIN 2 */
- /* Init Device Library */
-   USBD_Init(&USBD_Device, &FS_Desc, 0);
-  
- /* Add Supported Class */
-   USBD_RegisterClass(&USBD_Device, USBD_CDC_CLASS);
-   
- /* Add CDC Interface Class */
-   USBD_CDC_RegisterInterface(&USBD_Device, &USBD_Interface_fops_FS);
-   
-/* Start Device Process */
-   USBD_Start(&USBD_Device);
+ /* Output a message on Hyperterminal using printf function */
+   printf("\n\r UART Printf Example: retarget the C library printf function to the UART\n\r");
+   printf("** Test finished successfully. ** \n\r");
+ 
+
 
   /* USER CODE END 2 */
 
@@ -137,14 +137,14 @@ int main(void)
             NULL,
             1,
             NULL );
-
+/*
   xTaskCreate( &vRedBlinkTask,
             "RedBlink",
             configMINIMAL_STACK_SIZE, 
             NULL,
             1,
             NULL );
-
+*/
 
   /* USER CODE END RTOS_THREADS */
 
@@ -176,7 +176,6 @@ void SystemClock_Config(void)
 
   RCC_OscInitTypeDef RCC_OscInitStruct;
   RCC_ClkInitTypeDef RCC_ClkInitStruct;
-  RCC_PeriphCLKInitTypeDef PeriphClkInit;
 
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
@@ -193,11 +192,31 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
   HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2);
 
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
-  PeriphClkInit.UsbClockSelection = RCC_USBPLLCLK_DIV1_5;
-  HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit);
-
   __HAL_RCC_AFIO_CLK_ENABLE();
+
+}
+
+/* TIM1 init function */
+void MX_TIM1_Init(void)
+{
+
+  TIM_ClockConfigTypeDef sClockSourceConfig;
+  TIM_MasterConfigTypeDef sMasterConfig;
+
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 0;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 0;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  HAL_TIM_Base_Init(&htim1);
+
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig);
+
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig);
 
 }
 
@@ -211,7 +230,7 @@ void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 71;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = -1;
+  htim2.Init.Period = 0;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   HAL_TIM_Base_Init(&htim2);
 
@@ -221,12 +240,22 @@ void MX_TIM2_Init(void)
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig);
- /* Start Channel1 */
-  if (HAL_TIM_Base_Start_IT(&htim2) != HAL_OK)
-     {
-   /* Starting Error */
-       Error_Handler();
-   }
+
+}
+
+/* USART1 init function */
+void MX_USART1_UART_Init(void)
+{
+
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  HAL_UART_Init(&huart1);
 
 }
 
@@ -269,6 +298,7 @@ void vGreenBlinkTask( void *pvParametrs ) {
       HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
       vTaskDelay( 100 );
       HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
+      printf("Ok\n\r");
     }
 }
     
@@ -288,13 +318,24 @@ void tm_delay(uint16_t us)
     do { } while((TIM2->CNT - start) < us);
 }
 
+/**
+ * 129   * @brief  Retargets the C library printf function to the USART.
+ * 130   * @param  None
+ * 131   * @retval None
+ * 132   */
+ PUTCHAR_PROTOTYPE
+ {
+   /* Place your implementation of fputc here */
+   /* e.g. write a character to the USART1 and Loop until the end of transmission */
+   HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, 0xFFFF);
+
+  return ch;
+ }
 
 /* USER CODE END 4 */
 
 void StartDefaultTask(void const * argument)
 {
-  /* init code for USB_DEVICE */
-  MX_USB_DEVICE_Init();
 
   /* USER CODE BEGIN 5 */
  
@@ -309,16 +350,6 @@ void StartDefaultTask(void const * argument)
 }
  
  
-/**
-  210   * @brief  This function is executed in case of error occurrence.
-  211   * @param  None
-  212   * @retval None
-  213   */
-static void Error_Handler(void)
- {
-   /* Turn LED4 on */
-  while (1);
-}
 
 #ifdef USE_FULL_ASSERT
 

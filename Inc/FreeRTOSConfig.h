@@ -62,7 +62,7 @@
 /**
   ******************************************************************************
   * File Name          : FreeRTOSConfig.h
-  * Date               : 20/03/2015 13:00:29
+  * Date               : 26/03/2015 16:58:43
   ******************************************************************************
   */
 
@@ -98,8 +98,7 @@
 #define configTICK_RATE_HZ                       ((TickType_t)1000)
 #define configMAX_PRIORITIES                     ( 7 )
 #define configMINIMAL_STACK_SIZE                 ((uint16_t)128)
-//#define configTOTAL_HEAP_SIZE                    ((size_t)2000)
-#define configTOTAL_HEAP_SIZE                    ((size_t)6000)
+#define configTOTAL_HEAP_SIZE                    ((size_t)2000)
 #define configMAX_TASK_NAME_LEN                  ( 16 )
 #define configUSE_TRACE_FACILITY                 1
 #define configUSE_16_BIT_TICKS                   0
